@@ -1,0 +1,37 @@
+name: Publish common Maven package
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+    paths:
+      - 'common-module/**'
+      - '.github/workflows/maven-package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+          settings-path: ${{ runner.temp }}
+      - name: Publish to GitHub Packages
+        working-directory: common-module
+        run: >-
+          ./mvnw -B deploy
+          -DaltDeploymentRepository=github::https://maven.pkg.github.com/${GITHUB_REPOSITORY}
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
