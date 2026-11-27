@@ -1,0 +1,42 @@
+name: Publish Maven package
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: Java version to use
+        required: false
+        default: '21'
+        type: string
+      skip-tests:
+        description: Skip running tests
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out the calling repository
+        uses: actions/checkout@v4
+      - name: Set up Java ${{ inputs.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+      - name: Run tests
+        if: ${{ !inputs.skip-tests }}
+        run: mvn -B test
+      - name: Publish package to GitHub Packages
+        run: mvn -B deploy -DskipTests
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

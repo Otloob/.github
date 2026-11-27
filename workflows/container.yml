@@ -1,0 +1,51 @@
+name: Build and publish container image
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: Java version to use
+        required: false
+        default: '21'
+        type: string
+      skip-tests:
+        description: Skip running tests
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out the calling service repository
+        uses: actions/checkout@v4
+      - name: Set up Java ${{ inputs.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+      - name: Run tests
+        if: ${{ !inputs.skip-tests }}
+        run: mvn -B test
+      - name: Build JAR
+        run: mvn -B clean package -DskipTests
+      - name: Log in to GitHub Container Registry
+        if: github.ref_name == 'main' || github.ref_name == 'master'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish image with Jib
+        if: github.ref_name == 'main' || github.ref_name == 'master'
+        shell: bash
+        run: |
+          image_name="ghcr.io/${GITHUB_REPOSITORY,,}"
+          mvn -B compile com.google.cloud.tools:jib-maven-plugin:3.4.5:build \
+            -Djib.to.image="$image_name" \
+            -Djib.to.tags="${GITHUB_SHA},latest"
